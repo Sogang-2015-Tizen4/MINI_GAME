@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Insert title here</title>
+<script src="js/main.js"></script>
+<script src="http://code.jquery.com/jquery-1.11.3.min.js"></script>
+<script type="text/javascript">
+function setCookie(cName, cValue, cDay) {
+	var expire = new Date();
+	expire.setDate(expire.getDate() + cDay);
+	cookies = cName + '=' + escape(cValue) + '; path=/ '; // 한글 깨짐을 막기위해 escape(cValue)를 합니다.
+	if (typeof cDay != 'undefined')
+		cookies += ';expires=' + expire.toGMTString() + ';';
+	document.cookie = cookies;
+}
+function getCookie(cName) {
+	cName = cName + '=';
+	var cookieData = document.cookie;
+	var start = cookieData.indexOf(cName);
+	var cValue = '';
+	if (start != -1) {
+		start += cName.length;
+		var end = cookieData.indexOf(';', start);
+		if (end == -1)
+			end = cookieData.length;
+		cValue = cookieData.substring(start, end);
+	}
+	return unescape(cValue);
+}
+function setScore(score2) {
+ var msg = getCookie('ID');
+ var string  = msg;
+ var strArr = string.split('#');
+ setCookie('ID',strArr[0]+"#"+strArr[1]+"#"+strArr[2]+"#"+score2, 1);
+ var parameter = "id="+strArr[1]+"&score2="+score2;
+ var url = "http://cspro.sogang.ac.kr/~cse20101694/cgi-bin/bd_setScore2.php";
+
+	$.ajax({
+		type : "POST",
+		url : url,
+		data : parameter,
+		success : function(msg) {
+			if(msg==1) {
+				alert("success to upload score")
+				} else {
+					alert("fail to upload score")
+					}
+		},
+		error : function(XMLHttpRequest, textStatus, errorThrown) {
+			alert('some error ');
+		}
+	});
+}
+function goMenu() {
+	location.href = "menu.html";
+}
+function getUserScore() {
+	var msg = getCookie('ID');
+	var string = msg;
+	var strArr = string.split('#');
+
+	return strArr[3];
+}
+
+var vid = new Audio('data/game1.mp3');
+function playVid() { 
+    vid.play(); 
+} 
+
+function pauseVid() { 
+    vid.pause(); 
+}
+
+</script>
+</head>
+<body>
+</body>
+
+<script src="processing.js"></script>
+<script src="accel.js"></script>
+<script type="text/processing" data-processing-target="mycanvas">
+// init
+int winX, winY;
+int deviceX;
+PShape particle;
+PImage sprite, background, earth, satellite, ob1, ob2, ob3, ob4, ob5;
+Mover mover;
+Obstacle []ob;
+boolean isFinish;
+boolean isStop;
+int gameCount;
+int userScore, tempScore;
+int life;
+
+void setup() {
+  playVid();
+
+  winX=300; 
+  winY=500;
+  size(300, 500);
+  background = loadImage("data/background.jpg");
+  earth = loadImage("data/earth.png");
+  satellite = loadImage("data/satellite.png");
+  sprite = loadImage("data/sprite.png");
+  ob1 = loadImage("data/ob1.png");
+  ob2 = loadImage("data/ob2.png");
+  ob3 = loadImage("data/ob3.png");
+  ob4 = loadImage("data/ob4.png");
+  ob5 = loadImage("data/ob5.png");
+  isFinish = false;
+  isStop = true;
+  gameCount = 0;
+  userScore = getUserScore();
+  tempScore = 0;
+  life = 1;
+  mover = new Mover();
+  ob = new Obstacle[20];
+  for (int i=0; i<ob.length; i++)
+    ob[i] = new Obstacle(i%4+1);
+}
+
+void draw() {
+  // get device sensor
+  RegisterDeviceMotionListener();
+  deviceX = getX();
+  
+  smooth();
+  // background
+  image(background, 0, 0, winX, winY);
+
+  // draw movers
+  mover.display();
+  mover.upgrade(deviceX);
+
+  if (!isFinish) {
+    //ready
+    if (isStop) {
+      gameCount++;
+      drawCount();
+
+      if (gameCount == 240) {
+        isStop = false;
+        gameCount = 0;
+      }
+    } else {
+      // draw obstacles
+      for (int i=0; i<ob.length; i++) {
+        ob[i].display();
+        ob[i].upgrade();
+        ob[i].hit();
+        ob[i].crash();
+      }
+      // draw score
+      drawScore();
+    }
+  }
+  // finish
+  else {
+    drawFinish();
+    checkProcess(mouseX, mouseY);
+  }
+}
+
+void drawCount() {
+  int delay = (240-gameCount)/60;
+  fill(0, 255, 200, 255);
+  textSize(40);
+  text("Ready", winX/2-60, winY/2-70);
+  text((int)delay + "!", winX/2-30, winY/2-35);
+}
+
+void drawScore() {
+  fill(0, 255, 200, 255);
+  textSize(15);
+  text("LIFE : " + life, 10, 15);
+  text("Best Score : " + userScore, 10, 30);
+  text("Present Score : " + tempScore, 10, 45);
+}
+
+void drawFinish() {
+  pushMatrix();
+  textSize(20);
+  fill(0, 255, 200, 255);
+  text("Game Over", winX/2-120, winY/2-150);
+  text("Score : " + tempScore, winX/2-120, winY/2-90);
+  text("GoMENU ->", winX/2-120, winY/2-30);
+  text("ReGame ->", winX/2-120, winY/2+60);
+  noStroke();
+  fill(255, 0, 0, 255);
+  ellipse(winX/2+20, winY/2-30, 40, 40);
+  fill(0, 255, 0, 255);
+  ellipse(winX/2+20, winY/2+60, 40, 40);
+  popMatrix();
+}
+
+void checkProcess(float x, float y) {
+  float d1 = dist(x, y, winX/2+20, winY/2-30);
+  float d2 = dist(x, y, winX/2+20, winY/2+60);
+  if(tempScore > userScore) {
+	userScore = tempScore;
+    setScore(userScore);
+  }
+  //go menu
+  if(d1<40) {
+    pauseVid();
+	goMenu();
+  }
+  //regame
+  if(d2<40) {
+    isStop = true;
+    isFinish = false;
+    life = 1;
+    tempScore = 0;
+    for(int i=0 ; i<ob.length ; i++)
+      ob[i].initObstacle((int)random(1,4));
+  }
+}
+
+
+class Mover {
+  PVector shooterLoc;
+  PVector targetLoc;
+  PVector []missileDir;
+  PVector []missile;
+  Boolean []canShoot;
+  int numOfMissile;
+  int rad;
+  int count;
+  int delayMissile;
+  int alpha;
+
+  Mover() {
+    shooterLoc = new PVector(winX/2, winY/2);
+    targetLoc = new PVector(winX/2, 0);
+    rad = 40;
+    count = 0;
+    alpha = 0;
+    numOfMissile = 3;
+    missile = new PVector[numOfMissile];
+    missileDir = new PVector[numOfMissile];
+    canShoot = new Boolean[numOfMissile];
+    for(int i=0 ; i<missile.length ; i++) {
+      missile[i] = new PVector(winX/2, winY/2);
+      missileDir[i] = new PVector(0, 0);
+      initMissileDir(i);
+      canShoot[i] = false;
+    }
+  }
+  
+  void display() {
+    // draw lines
+    stroke(0, 255, 0, 255);
+    strokeWeight(1);
+    line(shooterLoc.x, shooterLoc.y, targetLoc.x, targetLoc.y);
+   
+    // draw shooter
+    drawShooter();
+    // draw Missile
+    drawMissile();
+  }
+  
+  void upgrade(float deviceX) {
+    alpha += deviceX/30;
+    targetLoc.x = winX/2 * cos(alpha) + winX/2;
+    targetLoc.y = winX/2 * sin(alpha) + winY/2;
+    
+    //missile
+    if (count < numOfMissile*15) {
+      count++;
+    }
+    for(int i=0 ; i<missile.length ; i++) {
+      if(canShoot[i]) {
+        missile[i].add(missileDir[i]);
+      }
+      else {
+        missile[i] = shooterLoc.get();
+      }
+      
+      if(count > 15*i) {
+        canShoot[i] = true;
+      }
+      //init if missile goes out to range
+      float d = dist(missile[i].x, missile[i].y, winX/2, winY/2);
+      if(d > winY/2) {
+        missile[i] = shooterLoc.get();
+      //  initMissileDir(i);
+      }
+      if(d < rad) {
+        initMissileDir(i);
+      }
+    }
+  }
+  
+  void initMissileDir(int i) {
+    missileDir[i] = targetLoc.get();
+    missileDir[i].sub(shooterLoc);
+    missileDir[i].normalize( );
+    missileDir[i].mult(5.5);
+  }
+  
+  void drawShooter() {
+    PVector temp;
+    
+    temp = targetLoc.get();
+    temp.sub(shooterLoc);
+    temp.normalize();
+    
+    // draw earth
+    pushMatrix();
+    translate(winX/2, winY/2);
+    strokeWeight(2);
+    stroke(255, 255, 255, 100);
+    noFill();
+    ellipse(0, 0, 80, 80);
+    image(earth, -25, -25, 50, 50);
+    popMatrix();
+    
+    // draw satellite
+    pushMatrix();
+    translate(winX/2, winY/2);
+    rotate(temp.heading2D());
+    translate(rad, 0);
+    rotate(PI/4);
+    image(satellite, -8, -8, 16, 16);
+    popMatrix();
+  }
+  
+  void drawMissile() {
+    float d;
+    for(int i=0 ; i<missile.length ; i++) {
+      d = dist(missile[i].x, missile[i].y, winX/2, winY/2);
+      if(d > rad) {
+        pushMatrix();
+        translate(missile[i].x, missile[i].y); 
+        image(sprite, -20, -20, 40, 40);
+        //shape(particle);
+        popMatrix();
+      }
+    }
+  }
+}
+
+
+class Obstacle {
+  PVector obLoc;
+  PVector obDir;
+  color C;
+  float delta;
+  float vel;
+  float locLen;
+  int shape;
+  
+  Obstacle(int i) {
+    initObstacle(i);
+  }
+  
+  void initObstacle(int i) {
+    //up
+    if (i==1) {
+      obLoc = new PVector(random(0, winX), 0);
+      obDir = new PVector(random(-0.5, 0.5), 1);
+    }
+    //down
+    else if (i==2) {
+      obLoc = new PVector(random(0, winX), winY);
+      obDir = new PVector(random(-0.5, 0.5), -1);
+    }
+    //left
+    else if (i==3) {
+      obLoc = new PVector(0, random(0, winY));
+      obDir = new PVector(1, random(-0.5, 0.5));
+    }
+    //right
+    else {
+      obLoc = new PVector(winX, random(0, winY));
+      obDir = new PVector(-1, random(-0.5, 0.5));
+    }
+
+    C = color(random(255), random(255), random(255), 240);
+    delta = random(0, PI);
+    vel = random(5, 100) * 0.01;
+    obDir.normalize();
+    obDir.mult(vel);
+    shape = (int)random(1, 5);
+  }
+  
+  void display() {
+    pushMatrix();
+    translate(obLoc.x, obLoc.y);
+    if (shape==1)
+      image(ob1, -8, -8, 16, 16);
+    else if (shape==2) {
+      image(ob2, -8, -8, 16, 16);
+    } else if (shape==3) {
+      image(ob3, -8, -8, 16, 16);
+    } else if (shape==4){
+      image(ob5, -8, -8, 16, 16);
+    } else {
+      image(ob4, -8, -8, 16, 16);
+    }
+    popMatrix();
+  }
+  
+  void upgrade() {
+    // rotate
+    delta += 0.02;
+    if ( delta > PI)
+      delta = 0.0;
+
+    // move to shooter
+    obLoc.add(obDir);
+
+    // if pass over 
+    if (obLoc.x<0 || obLoc.x>width ||
+      obLoc.y<0 || obLoc.y>height) {
+      initObstacle((int)random(1, 5));
+    }
+  }
+  
+  void hit() {
+    float d;
+    
+    for(int i=0 ; i<mover.missile.length ; i++) {
+      d = dist(obLoc.x, obLoc.y, mover.missile[i].x, mover.missile[i].y);
+      if(d < 10) {
+        initObstacle((int)random(1,4));
+        tempScore++;
+      }
+    }
+  }
+  
+  void crash() {
+    float d = dist(winX/2, winY/2, obLoc.x, obLoc.y);
+    if(d < 30) {
+      isStop = true;
+      life--;
+      for(int i=0 ; i<ob.length ; i++)
+        ob[i].initObstacle((int)random(1,4));
+      if(life==0)
+        isFinish = true;
+    }
+  }
+}
+</script>
+<canvas id="mycanvas"></canvas>
+
+</html>

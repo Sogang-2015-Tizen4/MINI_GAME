@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Insert title here</title>
+<script src="js/main.js"></script>
+<script src="http://code.jquery.com/jquery-1.11.3.min.js"></script>
+<script type="text/javascript">
+function setCookie(cName, cValue, cDay) {
+	var expire = new Date();
+	expire.setDate(expire.getDate() + cDay);
+	cookies = cName + '=' + escape(cValue) + '; path=/ '; // 한글 깨짐을 막기위해 escape(cValue)를 합니다.
+	if (typeof cDay != 'undefined')
+		cookies += ';expires=' + expire.toGMTString() + ';';
+	document.cookie = cookies;
+}
+function getCookie(cName) {
+	cName = cName + '=';
+	var cookieData = document.cookie;
+	var start = cookieData.indexOf(cName);
+	var cValue = '';
+	if (start != -1) {
+		start += cName.length;
+		var end = cookieData.indexOf(';', start);
+		if (end == -1)
+			end = cookieData.length;
+		cValue = cookieData.substring(start, end);
+	}
+	return unescape(cValue);
+}
+function setScore(score1) {
+ var msg = getCookie('ID');
+ var string  = msg;
+ var strArr = string.split('#');
+ setCookie('ID',strArr[0]+"#"+strArr[1]+"#"+score1+"#"+strArr[3], 1);
+ var parameter = "id="+strArr[1]+"&score1="+score1;
+ var url = "http://cspro.sogang.ac.kr/~cse20101694/cgi-bin/bd_setScore1.php";
+	
+	$.ajax({
+			type : "POST",
+			url : url,
+			data : parameter,
+			success : function(msg) {
+				if (msg == 1) {
+					alert("success to upload score")
+				} else {
+					alert("fail to upload score")
+				}
+			},
+			error : function(XMLHttpRequest, textStatus, errorThrown) {
+				alert('some error ');
+			}
+		});
+	};
+	function goMenu() {
+		location.href = "menu.html";
+	}
+	function getUserScore() {
+		var msg = getCookie('ID');
+		var string = msg;
+		var strArr = string.split('#');
+
+		return strArr[2];
+	}
+
+	var vid = new Audio('data/game1.mp3');
+	function playVid() { 
+	    vid.play(); 
+	} 
+
+	function pauseVid() { 
+	    vid.pause(); 
+	}
+
+</script>
+</head>
+<body>
+
+</body>
+
+<script src="processing.js"></script>
+<script src="accel.js"></script>
+<script type="text/processing" data-processing-target="mycanvas">
+int winX, winY;
+PImage background, snowMan2;
+Man man;
+Snow []snow;
+boolean isFinish;
+boolean isStop;
+int gameCount;
+int userScore, tempScore;
+int life;
+
+void setup() {
+  playVid();
+  winX = 300;
+  winY = 500;
+  size(300, 500);
+  background = loadImage("data/background2.png");
+  snowMan2 = loadImage("data/snowMan2.png");
+  isFinish = false;
+  isStop = true;
+  gameCount = 0;
+  userScore = getUserScore();
+  tempScore = 0;
+  life = 1;
+  man = new Man();
+  snow = new Snow[30];
+  for (int i=0; i<snow.length; i++)
+    snow[i] = new Snow();
+  //audio_play();
+}
+
+void draw() {
+  // get device sensor
+  RegisterDeviceMotionListener();
+  deviceX = getX();
+
+  smooth();
+  image(background, 0, 0, winX, winY);
+
+  man.display();
+  man.upgrade(deviceX);
+
+
+  if (!isFinish) {
+    if (isStop) {
+      gameCount++;
+      drawCount();
+
+      if (gameCount == 240) {
+        isStop = false;
+        gameCount = 0;
+      }
+    } else {
+      for (int i=0; i<snow.length; i++) {
+        snow[i].display();
+        snow[i].upgrade();
+        snow[i].hit();
+      }
+      drawScore();
+    }
+  } else {
+    drawFinish();
+    checkProcess(mouseX, mouseY);
+  }
+}
+
+void drawCount() {
+  int delay = (240-gameCount)/60;
+  fill(0, 255, 200, 255);
+  textSize(40);
+  text("Ready", winX/2-60, winY/2-70);
+  text((int)delay + "!", winX/2-30, winY/2-35);
+}
+
+void drawScore() {
+  fill(0, 255, 200, 255);
+  textSize(15);
+  text("LIFE : " + life, 10, 15);
+  text("Best Score : " + userScore, 10, 30);
+  text("Present Score : " + tempScore, 10, 45);
+}
+
+void drawFinish() {
+  pushMatrix();
+  textSize(20);
+  fill(0, 255, 200, 255);
+  text("Game Over", winX/2-120, winY/2-150);
+  text("Score : " + tempScore, winX/2-120, winY/2-90);
+  text("GoMENU ->", winX/2-120, winY/2-30);
+  text("ReGame ->", winX/2-120, winY/2+60);
+  noStroke();
+  fill(255, 0, 0, 255);
+  ellipse(winX/2+20, winY/2-30, 40, 40);
+  fill(0, 255, 0, 255);
+  ellipse(winX/2+20, winY/2+60, 40, 40);
+  popMatrix();
+}
+
+void checkProcess(float x, float y) {
+  float d1 = dist(x, y, winX/2+20, winY/2-30);
+  float d2 = dist(x, y, winX/2+20, winY/2+60);
+
+  if(tempScore > userScore) {
+	userScore = tempScore;
+	setScore(userScore);
+  }
+  //go menu
+  if(d1<40) {
+    pauseVid();
+    goMenu();
+  }
+  //regame
+  if(d2<40) {
+    isStop = true;
+    isFinish = false;
+    life = 1;
+    tempScore = 0;
+    for(int i=0 ; i<snow.length ; i++)
+      snow[i].initSnow();
+  }
+}
+
+
+class Man {
+  PVector manLoc;
+  PVector manDir;
+  int rad1, rad2;
+  Man() {
+    manLoc = new PVector(winX/2, winY-20);
+    rad1 = -20;
+    rad2 = 40;
+  }
+  
+  void display() {
+    pushMatrix();
+      translate(manLoc.x, manLoc.y);
+      image(snowMan2, rad1, rad1, rad2, rad2);
+    popMatrix();
+  }
+  
+  void upgrade(float deviceX) {
+    //
+    manLoc.x -= deviceX;
+    // boundary
+    int boundLeft = rad2/2;
+    int boundRight = winX;
+    
+    if(manLoc.x < boundLeft)
+      manLoc.x = boundLeft;
+    if(manLoc.x > boundRight)
+      manLoc.x = boundRight;    
+  }
+}
+
+class Snow {
+  PVector snowLoc;
+  PVector snowDir;
+  int rad1;
+  int rad2;
+
+  Snow() {
+    initSnow();
+    rad1 = -5;
+    rad2 = 10;
+  }
+
+  void display() {
+    pushMatrix();
+    translate(snowLoc.x, snowLoc.y);
+    fill(255, 255, 255, 255);
+    ellipse(0, 0, rad2, rad2);
+    popMatrix();
+  }
+
+  void upgrade() {
+    float scale = 0.05;
+
+    snowLoc.y += scale * snowDir.y;
+    //pass over
+    if (snowLoc.y > winY) {
+      snowLoc = new PVector(random(20, winX), 0);
+      snowDir.x = 0;
+	  snowDir.y += 10;
+      tempScore += 1;
+    }
+  }
+
+  void initSnow() {
+    snowLoc = new PVector(random(20, winX), 0);
+    snowDir= new PVector(0, random(10, 50));
+  }
+
+  void hit() {
+    float d = dist(man.manLoc.x, man.manLoc.y, snowLoc.x, snowLoc.y);
+    if (d < 10) {
+      isStop = true;
+      life--;
+      for (int i=0; i<snow.length; i++)
+        snow[i].initSnow();
+      if (life==0)
+        isFinish = true;
+    }
+  }
+}
+
+</script>
+<canvas id="mycanvas"></canvas>
+</html>

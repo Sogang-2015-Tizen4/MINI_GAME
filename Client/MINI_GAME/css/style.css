@@ -1,0 +1,21 @@
+* {
+    font-family: Lucida Sans, Arial, Helvetica, sans-serif;
+}
+
+body {
+    vertical-align : middle;
+    margin-left: 50px ;
+    background-color : #000;
+    font-size: 18px;
+    text-align: justify;
+    color: #ffffff;
+    font-style: italic;
+}
+
+
+footer p {
+    font-size: 12px;
+    color: #888;
+    margin-top: 24px;
+}
+
